@@ -742,8 +742,26 @@ public:
     state *best = after;
     for (state *move = after; move != after + 4; move++) {
       if (move->assign(b)) {
+        // TD(0)-state EVALUATE(s, a)
+        board state_ = move->after_state();
+        float eval = 0;
+        int n_space = 0;
+        for (int i = 0; i < 16; ++i) {
+          if (state_.at(i) == 0) {
+            ++n_space;
+            // pop up 1 at i
+            state_.set(i, 1);
+            eval += 0.9 * estimate(state_);
+            // pop up 2 at i
+            state_.set(i, 2);
+            eval += 0.1 * estimate(state_);
+            // clear at i
+            state_.set(i, 0);
+          }
+        }
+        eval = move->reward() + eval / n_space;
         // TD(0)-afterstate EVALUATE(s, a)
-        float eval = move->reward() + estimate(move->after_state());
+        // float eval = move->reward() + estimate(move->after_state());
         move->set_value(eval);
         if (move->value() > best->value())
           best = move;
@@ -770,14 +788,20 @@ public:
    *  where (x,x,x,x) means (before state, after state, action, reward)
    */
   void update_episode(std::vector<state> &path, float alpha = 0.1) const {
-    float exact = 0;
+    // float exact = 0;
+    // TD(0)-state LEARN_EVALUATE(s, a, r, s')
+    float v = 0;
     for (path.pop_back() /* terminal state */; path.size(); path.pop_back()) {
       state &move = path.back();
+      float error = move.reward() + v - estimate(move.before_state());
+      v = update(move.before_state(), alpha * error);
+      /*
       // TD(0)-afterstate LEARN_EVALUATE(s, a, r, s')
       float error = exact - (move.value() - move.reward());
       debug << "update error = " << error << " for after state" << std::endl
             << move.after_state();
       exact = move.reward() + update(move.after_state(), alpha * error);
+      */
     }
   }
 
